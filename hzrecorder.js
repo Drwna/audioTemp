@@ -1,5 +1,6 @@
 console.log("hzrecorder.js loaded");
 (function (window) {
+  console.log("1");
   window.URL = window.URL || window.webkitURL;
   // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
 
@@ -209,6 +210,7 @@ console.log("hzrecorder.js loaded");
   HZRecorder.canRecording = navigator.mediaDevices.getUserMedia != null;
   // 获取录音机
   HZRecorder.get = function (callback, config) {
+    console.log("2");
     if (!callback) return;
     if (navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices
