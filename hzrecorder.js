@@ -1,3 +1,4 @@
+console.log("hzrecorder.js loaded");
 (function (window) {
   window.URL = window.URL || window.webkitURL;
   // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
