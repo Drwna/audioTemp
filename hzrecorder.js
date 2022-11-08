@@ -225,7 +225,9 @@
 })(window);
 
 const btn = document.querySelector("button");
+console.log(HZRecorder);
 btn.addEventListener("click", () => {
+  console.log("点击了 按钮");
   HZRecorder.get(
     (res) => {
       console.log(res);
