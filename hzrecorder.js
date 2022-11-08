@@ -1,18 +1,18 @@
-console.log("hzrecorder.js loaded");
-(function (window) {
-  console.log("1");
-  window.URL = window.URL || window.webkitURL;
+console.log('hzrecorder.js loaded')
+;(function (window) {
+  console.log('1')
+  console.log('window ==>', window)
+  window.URL = window.URL || window.webkitURL
   // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
 
   var HZRecorder = function (stream, config) {
-    config = config || {};
-    config.sampleBits = config.sampleBits || 16; //采样数位 8, 16
-    config.sampleRate = config.sampleRate || 16000; // 采样率(1/6 44100)
-    var context = new (window.webkitAudioContext || window.AudioContext)();
-    var audioInput = context.createMediaStreamSource(stream);
-    var createScript =
-      context.createScriptProcessor || context.createJavaScriptNode;
-    var recorder = createScript.apply(context, [4096, 1, 1]);
+    config = config || {}
+    config.sampleBits = config.sampleBits || 16 //采样数位 8, 16
+    config.sampleRate = config.sampleRate || 16000 // 采样率(1/6 44100)
+    var context = new (window.webkitAudioContext || window.AudioContext)()
+    var audioInput = context.createMediaStreamSource(stream)
+    var createScript = context.createScriptProcessor || context.createJavaScriptNode
+    var recorder = createScript.apply(context, [4096, 1, 1])
     var audioData = {
       size: 0, // 录音文件长度
       buffer: [], // 录音缓存
@@ -21,220 +21,214 @@ console.log("hzrecorder.js loaded");
       outputSampleRate: config.sampleRate, // 输出采样率
       oututSampleBits: config.sampleBits, // 输出采样数位
       input: function (data) {
-        this.buffer.push(new Float32Array(data));
-        this.size += data.length;
+        this.buffer.push(new Float32Array(data))
+        this.size += data.length
       },
       compress: function () {
         //合并
-        var data = new Float32Array(this.size);
-        var offset = 0;
+        var data = new Float32Array(this.size)
+        var offset = 0
         for (var i = 0; i < this.buffer.length; i++) {
-          data.set(this.buffer[i], offset);
-          offset += this.buffer[i].length;
+          data.set(this.buffer[i], offset)
+          offset += this.buffer[i].length
         }
         //压缩
-        var compression = parseInt(
-          this.inputSampleRate / this.outputSampleRate
-        );
-        var length = data.length / compression;
-        var result = new Float32Array(length);
+        var compression = parseInt(this.inputSampleRate / this.outputSampleRate)
+        var length = data.length / compression
+        var result = new Float32Array(length)
         var index = 0,
-          j = 0;
+          j = 0
         while (index < length) {
-          result[index] = data[j];
-          j += compression;
-          index++;
+          result[index] = data[j]
+          j += compression
+          index++
         }
-        return result;
+        return result
       },
       encodeWAV: function () {
-        var sampleRate = Math.min(this.inputSampleRate, this.outputSampleRate);
-        var sampleBits = Math.min(this.inputSampleBits, this.oututSampleBits);
-        var bytes = this.compress();
-        var dataLength = bytes.length * (sampleBits / 8);
-        var buffer = new ArrayBuffer(44 + dataLength);
-        var data = new DataView(buffer);
+        var sampleRate = Math.min(this.inputSampleRate, this.outputSampleRate)
+        var sampleBits = Math.min(this.inputSampleBits, this.oututSampleBits)
+        var bytes = this.compress()
+        var dataLength = bytes.length * (sampleBits / 8)
+        var buffer = new ArrayBuffer(44 + dataLength)
+        var data = new DataView(buffer)
 
-        var channelCount = 1; // 单声道
-        var offset = 0;
+        var channelCount = 1 // 单声道
+        var offset = 0
 
         var writeString = function (str) {
           for (var i = 0; i < str.length; i++) {
-            data.setUint8(offset + i, str.charCodeAt(i));
-          }
-        };
-
-        // 资源交换文件标识符
-        writeString("RIFF");
-        offset += 4;
-        // 下个地址开始到文件尾总字节数,即文件大小-8
-        data.setUint32(offset, 36 + dataLength, true);
-        offset += 4;
-        // WAV文件标志
-        writeString("WAVE");
-        offset += 4;
-        // 波形格式标志
-        writeString("fmt ");
-        offset += 4;
-        // 过滤字节,一般为 0x10 = 16
-        data.setUint32(offset, 16, true);
-        offset += 4;
-        // 格式类别 (PCM形式采样数据)
-        data.setUint16(offset, 1, true);
-        offset += 2;
-        // 通道数
-        data.setUint16(offset, channelCount, true);
-        offset += 2;
-        // 采样率,每秒样本数,表示每个通道的播放速度
-        data.setUint32(offset, sampleRate, true);
-        offset += 4;
-        // 波形数据传输率 (每秒平均字节数) 单声道×每秒数据位数×每样本数据位/8
-        data.setUint32(
-          offset,
-          channelCount * sampleRate * (sampleBits / 8),
-          true
-        );
-        offset += 4;
-        // 快数据调整数 采样一次占用字节数 单声道×每样本的数据位数/8
-        data.setUint16(offset, channelCount * (sampleBits / 8), true);
-        offset += 2;
-        // 每样本数据位数
-        data.setUint16(offset, sampleBits, true);
-        offset += 2;
-        // 数据标识符
-        writeString("data");
-        offset += 4;
-        // 采样数据总数,即数据总大小-44
-        data.setUint32(offset, dataLength, true);
-        offset += 4;
-        // 写入采样数据
-        if (sampleBits === 8) {
-          for (var i = 0; i < bytes.length; i++, offset++) {
-            var s = Math.max(-1, Math.min(1, bytes[i]));
-            var val = s < 0 ? s * 0x8000 : s * 0x7fff;
-            val = parseInt(255 / (65535 / (val + 32768)));
-            data.setInt8(offset, val, true);
-          }
-        } else {
-          for (var i = 0; i < bytes.length; i++, offset += 2) {
-            var s = Math.max(-1, Math.min(1, bytes[i]));
-            data.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+            data.setUint8(offset + i, str.charCodeAt(i))
           }
         }
 
-        return new Blob([data], { type: "audio/wav" });
+        // 资源交换文件标识符
+        writeString('RIFF')
+        offset += 4
+        // 下个地址开始到文件尾总字节数,即文件大小-8
+        data.setUint32(offset, 36 + dataLength, true)
+        offset += 4
+        // WAV文件标志
+        writeString('WAVE')
+        offset += 4
+        // 波形格式标志
+        writeString('fmt ')
+        offset += 4
+        // 过滤字节,一般为 0x10 = 16
+        data.setUint32(offset, 16, true)
+        offset += 4
+        // 格式类别 (PCM形式采样数据)
+        data.setUint16(offset, 1, true)
+        offset += 2
+        // 通道数
+        data.setUint16(offset, channelCount, true)
+        offset += 2
+        // 采样率,每秒样本数,表示每个通道的播放速度
+        data.setUint32(offset, sampleRate, true)
+        offset += 4
+        // 波形数据传输率 (每秒平均字节数) 单声道×每秒数据位数×每样本数据位/8
+        data.setUint32(offset, channelCount * sampleRate * (sampleBits / 8), true)
+        offset += 4
+        // 快数据调整数 采样一次占用字节数 单声道×每样本的数据位数/8
+        data.setUint16(offset, channelCount * (sampleBits / 8), true)
+        offset += 2
+        // 每样本数据位数
+        data.setUint16(offset, sampleBits, true)
+        offset += 2
+        // 数据标识符
+        writeString('data')
+        offset += 4
+        // 采样数据总数,即数据总大小-44
+        data.setUint32(offset, dataLength, true)
+        offset += 4
+        // 写入采样数据
+        if (sampleBits === 8) {
+          for (var i = 0; i < bytes.length; i++, offset++) {
+            var s = Math.max(-1, Math.min(1, bytes[i]))
+            var val = s < 0 ? s * 0x8000 : s * 0x7fff
+            val = parseInt(255 / (65535 / (val + 32768)))
+            data.setInt8(offset, val, true)
+          }
+        } else {
+          for (var i = 0; i < bytes.length; i++, offset += 2) {
+            var s = Math.max(-1, Math.min(1, bytes[i]))
+            data.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true)
+          }
+        }
+
+        return new Blob([data], { type: 'audio/wav' })
       },
-    };
+    }
 
     // 开始录音
     this.start = function () {
-      audioInput.connect(recorder);
-      recorder.connect(context.destination);
-    };
+      audioInput.connect(recorder)
+      recorder.connect(context.destination)
+    }
 
     // 暂停
     this.stop = function () {
-      recorder.disconnect();
-    };
+      recorder.disconnect()
+    }
 
     // 获取音频文件
     this.getBlob = function () {
       //this.stop();
-      return audioData.encodeWAV(false);
-    };
+      return audioData.encodeWAV(false)
+    }
 
     // 播放
     this.play = function (audio) {
-      audio.src = window.URL.createObjectURL(this.getBlob());
-    };
+      audio.src = window.URL.createObjectURL(this.getBlob())
+    }
 
     this.clearBuffer = function () {
-      audioData.buffer = [];
-      audioData.size = 0;
-    };
+      audioData.buffer = []
+      audioData.size = 0
+    }
 
     // 上传
     this.upload = function (url, callback) {
-      var fd = new FormData();
-      fd.append("audioData", this.getBlob());
-      var xhr = new XMLHttpRequest();
+      var fd = new FormData()
+      fd.append('audioData', this.getBlob())
+      var xhr = new XMLHttpRequest()
       if (callback) {
         xhr.upload.addEventListener(
-          "progress",
+          'progress',
           function (e) {
-            callback("uploading", e);
+            callback('uploading', e)
           },
-          false
-        );
+          false,
+        )
         xhr.addEventListener(
-          "load",
+          'load',
           function (e) {
-            callback("ok", e);
+            callback('ok', e)
           },
-          false
-        );
+          false,
+        )
         xhr.addEventListener(
-          "error",
+          'error',
           function (e) {
-            callback("error", e);
+            callback('error', e)
           },
-          false
-        );
+          false,
+        )
         xhr.addEventListener(
-          "abort",
+          'abort',
           function (e) {
-            callback("cancel", e);
+            callback('cancel', e)
           },
-          false
-        );
+          false,
+        )
       }
-      xhr.open("POST", url);
-      xhr.send(fd);
-    };
+      xhr.open('POST', url)
+      xhr.send(fd)
+    }
 
     // 音频采集
     recorder.onaudioprocess = function (e) {
-      audioData.input(e.inputBuffer.getChannelData(0));
-    };
-  };
+      audioData.input(e.inputBuffer.getChannelData(0))
+    }
+  }
   // 抛出异常
   HZRecorder.throwError = function (message) {
-    alert(message);
+    alert(message)
     throw new (function () {
       this.toString = function () {
-        return message;
-      };
-    })();
-  };
+        return message
+      }
+    })()
+  }
   // 是否支持录音
-  HZRecorder.canRecording = navigator.mediaDevices.getUserMedia != null;
+  HZRecorder.canRecording = navigator.mediaDevices.getUserMedia != null
   // 获取录音机
   HZRecorder.get = function (callback, config) {
-    console.log("2");
-    if (!callback) return;
+    console.log('2')
+    if (!callback) return
     if (navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices
         .getUserMedia({ audio: true })
         .then(function (mediaStream) {
-          var rec = new HZRecorder(mediaStream, config);
-          callback(rec);
+          var rec = new HZRecorder(mediaStream, config)
+          callback(rec)
         })
         .catch(function (error) {
-          console.log("错误:", error);
-        });
+          console.log('错误:', error)
+        })
     }
-  };
-  window.HZRecorder = HZRecorder;
-})(window);
+  }
+  window.HZRecorder = HZRecorder
+})(window)
 
-const btn = document.querySelector("button");
-console.log(HZRecorder);
-btn.addEventListener("click", () => {
-  console.log("点击了 按钮");
+const btn = document.querySelector('button')
+console.log(HZRecorder)
+btn.addEventListener('click', () => {
+  console.log('点击了 按钮')
   HZRecorder.get(
     (res) => {
-      console.log(res);
+      console.log(res)
     },
-    { sampleBits: 16, sampleRate: 8000 }
-  );
-});
+    { sampleBits: 16, sampleRate: 8000 },
+  )
+})
